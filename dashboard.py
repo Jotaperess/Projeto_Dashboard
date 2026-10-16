@@ -1,3 +1,4 @@
+
 import pandas as pd
 import streamlit as st
 from scipy import stats
@@ -15,6 +16,7 @@ CORES = {
     "Outono": "#D97B55"
 }
 
+
 @st.cache_data
 def carregar_dados():
     dados = pd.read_csv("SeoulBikeData.csv", encoding="latin1")
@@ -30,7 +32,9 @@ def carregar_dados():
     })
 
     dados["Data"] = pd.to_datetime(
-        dados["Data"], format="%d/%m/%Y", errors="coerce"
+        dados["Data"],
+        format="%d/%m/%Y",
+        errors="coerce"
     )
 
     dados["Estacao"] = dados["Estacao"].replace({
@@ -43,8 +47,12 @@ def carregar_dados():
     dados = dados.drop_duplicates(subset=["Data", "Hora"])
 
     dados = dados.dropna(subset=[
-        "Data", "Alugueis", "Temperatura",
-        "Chuva", "Hora", "Estacao"
+        "Data",
+        "Alugueis",
+        "Temperatura",
+        "Chuva",
+        "Hora",
+        "Estacao"
     ])
 
     dados = dados[
@@ -56,6 +64,7 @@ def carregar_dados():
 
     return dados
 
+
 try:
     df = carregar_dados()
 except FileNotFoundError:
@@ -65,6 +74,7 @@ except FileNotFoundError:
 if df.empty:
     st.error("Nenhum registro válido foi encontrado.")
     st.stop()
+
 
 st.markdown("""
 <div style="
@@ -86,6 +96,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
 with st.container(border=True):
     st.markdown("**Personalize os dados exibidos**")
 
@@ -103,6 +114,7 @@ with st.container(border=True):
             ["Todos", "Dias úteis", "Fim de semana"]
         )
 
+
 filtro = df.copy()
 
 if estacao != "Todas":
@@ -116,6 +128,7 @@ elif tipo == "Fim de semana":
 if filtro.empty:
     st.warning("Não há registros para esses filtros.")
     st.stop()
+
 
 st.subheader("Visão geral")
 
@@ -149,6 +162,7 @@ with m4:
         border=True
     )
 
+
 st.subheader("Perfil da demanda")
 
 g1, g2 = st.columns(2, gap="medium")
@@ -174,6 +188,7 @@ with g1:
         st.caption(
             "Média de aluguéis registrados em cada hora."
         )
+
 
 with g2:
     with st.container(border=True):
@@ -215,7 +230,11 @@ with g2:
                     },
                     "tooltip": [
                         {"field": "Estacao", "type": "nominal"},
-                        {"field": "Alugueis", "type": "quantitative", "format": ".1f"}
+                        {
+                            "field": "Alugueis",
+                            "type": "quantitative",
+                            "format": ".1f"
+                        }
                     ]
                 },
                 "height": 260
@@ -226,6 +245,7 @@ with g2:
         st.caption(
             "🟦 Inverno · 🟩 Primavera · 🟨 Verão · 🟧 Outono"
         )
+
 
 with st.container(border=True):
     st.markdown("#### Temperatura e quantidade de aluguéis")
@@ -243,6 +263,7 @@ with st.container(border=True):
     st.caption(
         "A escala de cores representa a temperatura registrada."
     )
+
 
 with st.container(border=True):
     st.markdown("#### Evolução mensal da demanda")
@@ -262,8 +283,10 @@ with st.container(border=True):
     )
 
     st.caption(
-        "Os dados são agrupados por mês, utilizando a média de aluguéis por hora."
+        "Os dados são agrupados por mês, utilizando "
+        "a média de aluguéis por hora."
     )
+
 
 with st.expander("Consultar dados e estatísticas descritivas"):
     st.markdown("#### Estatísticas descritivas")
@@ -295,13 +318,15 @@ with st.expander("Consultar dados e estatísticas descritivas"):
         height=350
     )
 
+
 st.divider()
 st.subheader("Testes de hipóteses")
 
 st.caption(
-    "Comparações de médias diárias com teste t de Welch e visualização "
-    "do comportamento médio ao longo das 24 horas."
+    "Comparações de médias diárias com teste t de Welch "
+    "e visualização do comportamento médio ao longo das 24 horas."
 )
+
 
 diario = df.groupby("Data").agg(
     Media=("Alugueis", "mean"),
@@ -312,26 +337,26 @@ diario = df.groupby("Data").agg(
 
 diario["Choveu"] = diario["Chuva"] > 0
 
+
 def grafico_teste_linhas(
     titulo,
     dados_horarios,
-    grupo_a_hora,
-    grupo_b_hora,
     nome_a,
     nome_b,
     cor_a,
     cor_b,
-    grupo_a_teste,
-    grupo_b_teste
+    grupo_a,
+    grupo_b
 ):
     teste = stats.ttest_ind(
-        grupo_a_teste,
-        grupo_b_teste,
+        grupo_a,
+        grupo_b,
         equal_var=False
     )
 
     ic = teste.confidence_interval(0.95)
-    diferenca = grupo_a_teste.mean() - grupo_b_teste.mean()
+
+    diferenca = grupo_a.mean() - grupo_b.mean()
 
     with st.container(border=True):
         st.markdown(f"#### {titulo}")
@@ -350,10 +375,11 @@ def grafico_teste_linhas(
                     "x": {
                         "field": "Hora",
                         "type": "ordinal",
+                        "sort": "ascending",
                         "title": "Hora do dia"
                     },
                     "y": {
-                        "field": "Media",
+                        "field": "Alugueis",
                         "type": "quantitative",
                         "title": "Média de aluguéis"
                     },
@@ -370,9 +396,21 @@ def grafico_teste_linhas(
                         }
                     },
                     "tooltip": [
-                        {"field": "Hora", "type": "ordinal"},
-                        {"field": "Grupo", "type": "nominal"},
-                        {"field": "Media", "type": "quantitative", "format": ".1f"}
+                        {
+                            "field": "Hora",
+                            "type": "ordinal",
+                            "title": "Hora"
+                        },
+                        {
+                            "field": "Grupo",
+                            "type": "nominal"
+                        },
+                        {
+                            "field": "Alugueis",
+                            "type": "quantitative",
+                            "title": "Média",
+                            "format": ".1f"
+                        }
                     ]
                 },
                 "height": 300
@@ -381,7 +419,8 @@ def grafico_teste_linhas(
         )
 
         st.caption(
-            "As linhas mostram a média de aluguéis em cada hora do dia para cada grupo."
+            "As linhas mostram a média de aluguéis "
+            "em cada hora do dia para cada grupo."
         )
 
         c1, c2 = st.columns(2)
@@ -389,16 +428,16 @@ def grafico_teste_linhas(
         with c1:
             st.metric(
                 f"Média diária: {nome_a}",
-                f"{grupo_a_teste.mean():.1f}"
+                f"{grupo_a.mean():.1f}"
             )
 
         with c2:
             st.metric(
                 f"Média diária: {nome_b}",
-                f"{grupo_b_teste.mean():.1f}"
+                f"{grupo_b.mean():.1f}"
             )
 
-        c3, c4, c5 = st.columns(3)
+        c3, c4 = st.columns(2)
 
         with c3:
             st.metric(
@@ -412,17 +451,16 @@ def grafico_teste_linhas(
                 if teste.pvalue < 0.0001
                 else f"{teste.pvalue:.4f}".replace(".", ",")
             )
+
             st.metric("Valor-p", valor_p)
 
-        with c5:
-            st.metric(
-                "IC 95%",
-                f"[{ic.low:.1f}; {ic.high:.1f}]"
-            )
+        st.caption(
+            f"Intervalo de confiança de 95%: "
+            f"[{ic.low:.2f}; {ic.high:.2f}]"
+        )
 
         st.caption(
-            "O teste estatístico compara as médias diárias entre os grupos. "
-            "Já o gráfico mostra como a demanda média varia ao longo das horas."
+            f"Amostra: {len(grupo_a)} e {len(grupo_b)} dias."
         )
 
     return {
@@ -432,31 +470,43 @@ def grafico_teste_linhas(
         "IC 95%": f"[{ic.low:.2f}; {ic.high:.2f}]"
     }
 
+
 chuva_teste = diario.loc[diario["Choveu"], "Media"]
 sem_chuva_teste = diario.loc[~diario["Choveu"], "Media"]
 
 fins_teste = diario.loc[diario["FimSemana"], "Media"]
 uteis_teste = diario.loc[~diario["FimSemana"], "Media"]
 
-chuva_hora = df[df["Chuva"] > 0].groupby("Hora")["Alugueis"].mean()
-sem_chuva_hora = df[df["Chuva"] == 0].groupby("Hora")["Alugueis"].mean()
 
-comparacao_chuva = pd.DataFrame({
-    "Hora": list(range(24)) + list(range(24)),
-    "Media": [chuva_hora.get(h, 0) for h in range(24)] +
-             [sem_chuva_hora.get(h, 0) for h in range(24)],
-    "Grupo": ["Com chuva"] * 24 + ["Sem chuva"] * 24
+dados_chuva = df.copy()
+
+dados_chuva["Choveu"] = dados_chuva["Data"].map(
+    diario["Choveu"]
+)
+
+dados_chuva["Grupo"] = dados_chuva["Choveu"].map({
+    True: "Com chuva",
+    False: "Sem chuva"
 })
 
-fim_hora = df[df["FimSemana"]].groupby("Hora")["Alugueis"].mean()
-uteis_hora = df[~df["FimSemana"]].groupby("Hora")["Alugueis"].mean()
+comparacao_chuva = dados_chuva.groupby(
+    ["Hora", "Grupo"],
+    as_index=False
+)["Alugueis"].mean()
 
-comparacao_fim = pd.DataFrame({
-    "Hora": list(range(24)) + list(range(24)),
-    "Media": [fim_hora.get(h, 0) for h in range(24)] +
-             [uteis_hora.get(h, 0) for h in range(24)],
-    "Grupo": ["Fim de semana"] * 24 + ["Dias úteis"] * 24
+
+dados_fim = df.copy()
+
+dados_fim["Grupo"] = dados_fim["FimSemana"].map({
+    True: "Fim de semana",
+    False: "Dias úteis"
 })
+
+comparacao_fim = dados_fim.groupby(
+    ["Hora", "Grupo"],
+    as_index=False
+)["Alugueis"].mean()
+
 
 h1, h2 = st.columns(2, gap="medium")
 
@@ -464,8 +514,6 @@ with h1:
     resultado1 = grafico_teste_linhas(
         "Chuva × Sem chuva",
         comparacao_chuva,
-        "Com chuva",
-        "Sem chuva",
         "Com chuva",
         "Sem chuva",
         "#579BD3",
@@ -480,16 +528,18 @@ with h2:
         comparacao_fim,
         "Fim de semana",
         "Dias úteis",
-        "Fim de semana",
-        "Dias úteis",
         "#D97B55",
         "#40AA82",
         fins_teste,
         uteis_teste
     )
 
+
 with st.expander("Tabela dos resultados estatísticos"):
-    resultados = pd.DataFrame([resultado1, resultado2])
+    resultados = pd.DataFrame([
+        resultado1,
+        resultado2
+    ])
 
     st.dataframe(
         resultados,
@@ -498,16 +548,22 @@ with st.expander("Tabela dos resultados estatísticos"):
     )
 
 st.caption(
-    "Os testes utilizam todos os dias disponíveis, sem aplicar os filtros superiores. "
+    "Os testes utilizam todos os dias disponíveis, "
+    "sem aplicar os filtros superiores. "
+    "Os gráficos mostram a média horária de cada grupo, "
+    "enquanto os testes comparam as médias diárias. "
     "Diferenças estatísticas não demonstram causalidade."
 )
+
 
 st.divider()
 st.subheader("Regressão linear")
 
 st.caption(
-    "Estimativa da média diária de aluguéis por hora a partir da temperatura média diária."
+    "Relação entre a temperatura média diária "
+    "e a média diária de aluguéis por hora."
 )
+
 
 corte = int(len(diario) * 0.8)
 
@@ -540,6 +596,7 @@ r_quadrado = (
     if total > 0 else float("nan")
 )
 
+
 rcol1, rcol2, rcol3 = st.columns(3)
 
 with rcol1:
@@ -563,38 +620,129 @@ with rcol3:
         border=True
     )
 
-with st.container(border=True):
-    st.markdown("#### Valores reais × previstos")
 
-    st.line_chart(
-        teste[["Real", "Previsto"]],
-        color=["#579BD3", "#0D9488"],
-        height=310,
-        x_label="Data",
-        y_label="Média de aluguéis por hora"
+with st.container(border=True):
+    st.markdown("#### Temperatura × Demanda — Regressão linear")
+
+    grafico = teste[
+        ["Temperatura", "Real", "Previsto"]
+    ].reset_index().sort_values("Temperatura")
+
+    st.vega_lite_chart(
+        grafico,
+        {
+            "layer": [
+                {
+                    "mark": {
+                        "type": "circle",
+                        "size": 75,
+                        "opacity": 0.7,
+                        "color": "#579BD3"
+                    },
+                    "encoding": {
+                        "x": {
+                            "field": "Temperatura",
+                            "type": "quantitative",
+                            "title": "Temperatura média diária (°C)"
+                        },
+                        "y": {
+                            "field": "Real",
+                            "type": "quantitative",
+                            "title": "Média de aluguéis por hora"
+                        },
+                        "tooltip": [
+                            {
+                                "field": "Data",
+                                "type": "temporal",
+                                "title": "Data",
+                                "format": "%d/%m/%Y"
+                            },
+                            {
+                                "field": "Temperatura",
+                                "type": "quantitative",
+                                "format": ".1f"
+                            },
+                            {
+                                "field": "Real",
+                                "type": "quantitative",
+                                "title": "Aluguéis observados",
+                                "format": ".1f"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "mark": {
+                        "type": "line",
+                        "color": "#0D9488",
+                        "strokeWidth": 3
+                    },
+                    "encoding": {
+                        "x": {
+                            "field": "Temperatura",
+                            "type": "quantitative"
+                        },
+                        "y": {
+                            "field": "Previsto",
+                            "type": "quantitative"
+                        },
+                        "tooltip": [
+                            {
+                                "field": "Temperatura",
+                                "type": "quantitative",
+                                "format": ".1f"
+                            },
+                            {
+                                "field": "Previsto",
+                                "type": "quantitative",
+                                "title": "Aluguéis previstos",
+                                "format": ".1f"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "height": 340
+        },
+        use_container_width=True
     )
 
     st.caption(
-        "Azul: valores reais. Verde: estimativas do modelo."
+        "Azul: valores reais observados. "
+        "Verde: valores estimados pela regressão linear. "
+        "O gráfico utiliza os dados do conjunto de teste."
     )
+
 
 with st.expander("Detalhes do modelo"):
+    st.markdown("**Equação da regressão**")
+
     st.write(
-        f"Equação: Y = {modelo.intercept:.2f} + ({modelo.slope:.2f} × Temperatura)"
+        f"Y = {modelo.intercept:.2f} "
+        f"+ ({modelo.slope:.2f} × Temperatura)"
+    )
+
+    st.markdown("**Divisão dos dados**")
+
+    st.write(
+        "Treinamento: primeiros 80% dos dias."
     )
 
     st.write(
-        "Treinamento: primeiros 80% dos dias. "
         "Teste: últimos 20% dos dias."
     )
+
+    st.markdown("**Valores utilizados na avaliação**")
 
     st.dataframe(
         teste[["Temperatura", "Real", "Previsto"]].round(2),
         use_container_width=True
     )
 
+
 st.divider()
 
 st.caption(
-    "Fonte: Seoul Bike Sharing Demand — UCI Machine Learning Repository (2017–2018)."
+    "Fonte: Seoul Bike Sharing Demand — "
+    "UCI Machine Learning Repository (2017–2018)."
 )
