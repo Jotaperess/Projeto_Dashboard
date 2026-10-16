@@ -25,7 +25,7 @@ def carregar_dados():
         "Date": "Data",
         "Rented Bike Count": "Alugueis",
         "Hour": "Hora",
-        dados.columns[3]: "Temperatura",
+        "Temperature(°C)": "Temperatura",
         "Rainfall(mm)": "Chuva",
         "Seasons": "Estacao",
         "Functioning Day": "Funcionamento"
@@ -100,15 +100,15 @@ st.markdown("""
 with st.container(border=True):
     st.markdown("**Personalize os dados exibidos**")
 
-    col1, col2 = st.columns(2)
+    f1, f2 = st.columns(2)
 
-    with col1:
+    with f1:
         estacao = st.selectbox(
             "Estação do ano",
             ["Todas", "Inverno", "Primavera", "Verão", "Outono"]
         )
 
-    with col2:
+    with f2:
         tipo = st.selectbox(
             "Tipo de dia",
             ["Todos", "Dias úteis", "Fim de semana"]
@@ -212,7 +212,7 @@ with g2:
                         "field": "Estacao",
                         "type": "nominal",
                         "sort": ordem,
-                        "title": "Estação do ano"
+                        "title": "Estação"
                     },
                     "y": {
                         "field": "Alugueis",
@@ -229,7 +229,10 @@ with g2:
                         "legend": None
                     },
                     "tooltip": [
-                        {"field": "Estacao", "type": "nominal"},
+                        {
+                            "field": "Estacao",
+                            "type": "nominal"
+                        },
                         {
                             "field": "Alugueis",
                             "type": "quantitative",
@@ -283,8 +286,8 @@ with st.container(border=True):
     )
 
     st.caption(
-        "Os dados são agrupados por mês, utilizando "
-        "a média de aluguéis por hora."
+        "Cada ponto representa a média de aluguéis "
+        "por hora naquele mês."
     )
 
 
@@ -323,8 +326,8 @@ st.divider()
 st.subheader("Testes de hipóteses")
 
 st.caption(
-    "Comparações de médias diárias com teste t de Welch "
-    "e visualização do comportamento médio ao longo das 24 horas."
+    "Teste t de Welch comparando médias diárias de aluguéis por hora. "
+    "Cada ponto representa um dia; losangos mostram as médias dos grupos."
 )
 
 
@@ -338,207 +341,440 @@ diario = df.groupby("Data").agg(
 diario["Choveu"] = diario["Chuva"] > 0
 
 
-def grafico_teste_linhas(
+def grafico_teste(
     titulo,
-    dados_horarios,
+    grupo_a,
+    grupo_b,
     nome_a,
     nome_b,
     cor_a,
-    cor_b,
-    grupo_a,
-    grupo_b
+    cor_b
 ):
+    if len(grupo_a) < 2 or len(grupo_b) < 2:
+        st.warning(f"Dados insuficientes para {titulo}.")
+        return None
+
+    media_a = grupo_a.mean()
+    media_b = grupo_b.mean()
+    diferenca = media_a - media_b
+
     teste = stats.ttest_ind(
         grupo_a,
         grupo_b,
         equal_var=False
     )
 
-    ic = teste.confidence_interval(0.95)
+    ic_diferenca = teste.confidence_interval(
+        confidence_level=0.95
+    )
 
-    diferenca = grupo_a.mean() - grupo_b.mean()
+    ic_a = stats.t.interval(
+        0.95,
+        len(grupo_a) - 1,
+        loc=media_a,
+        scale=stats.sem(grupo_a)
+    )
+
+    ic_b = stats.t.interval(
+        0.95,
+        len(grupo_b) - 1,
+        loc=media_b,
+        scale=stats.sem(grupo_b)
+    )
+
+    pontos = pd.concat([
+        grupo_a.reset_index().assign(
+            Grupo=nome_a,
+            Centro=1
+        ),
+        grupo_b.reset_index().assign(
+            Grupo=nome_b,
+            Centro=2
+        )
+    ], ignore_index=True)
+
+    pontos = pontos.rename(columns={
+        "Media": "MediaDiaria"
+    })
+
+    pontos["Posicao"] = pontos["Centro"] + [
+        ((i * 17) % 29 - 14) / 65
+        for i in range(len(pontos))
+    ]
+
+    medias = pd.DataFrame({
+        "Grupo": [nome_a, nome_b],
+        "Centro": [1, 2],
+        "MediaDiaria": [media_a, media_b],
+        "IC_Inferior": [ic_a[0], ic_b[0]],
+        "IC_Superior": [ic_a[1], ic_b[1]]
+    })
+
+    cores = {
+        "field": "Grupo",
+        "type": "nominal",
+        "scale": {
+            "domain": [nome_a, nome_b],
+            "range": [cor_a, cor_b]
+        },
+        "legend": {
+            "title": None,
+            "orient": "top"
+        }
+    }
 
     with st.container(border=True):
         st.markdown(f"#### {titulo}")
 
-        st.markdown("**Comportamento médio ao longo do dia**")
+        st.markdown(
+            "**Médias diárias e intervalos de confiança de 95%**"
+        )
 
         st.vega_lite_chart(
-            dados_horarios,
+            pontos,
             {
-                "mark": {
-                    "type": "line",
-                    "point": True,
-                    "strokeWidth": 3
-                },
-                "encoding": {
-                    "x": {
-                        "field": "Hora",
-                        "type": "ordinal",
-                        "sort": "ascending",
-                        "title": "Hora do dia"
-                    },
-                    "y": {
-                        "field": "Alugueis",
-                        "type": "quantitative",
-                        "title": "Média de aluguéis"
-                    },
-                    "color": {
-                        "field": "Grupo",
-                        "type": "nominal",
-                        "scale": {
-                            "domain": [nome_a, nome_b],
-                            "range": [cor_a, cor_b]
+                "layer": [
+                    {
+                        "mark": {
+                            "type": "circle",
+                            "size": 55,
+                            "opacity": 0.4
                         },
-                        "legend": {
-                            "title": None,
-                            "orient": "top"
+                        "encoding": {
+                            "x": {
+                                "field": "MediaDiaria",
+                                "type": "quantitative",
+                                "title": "Média de aluguéis por hora no dia"
+                            },
+                            "y": {
+                                "field": "Posicao",
+                                "type": "quantitative",
+                                "scale": {
+                                    "domain": [0.55, 2.45]
+                                },
+                                "axis": {
+                                    "title": None,
+                                    "values": [1, 2],
+                                    "grid": False,
+                                    "labelExpr": (
+                                        f"datum.value == 1 ? "
+                                        f"'{nome_a}' : '{nome_b}'"
+                                    )
+                                }
+                            },
+                            "color": cores,
+                            "tooltip": [
+                                {
+                                    "field": "Data",
+                                    "type": "temporal",
+                                    "format": "%d/%m/%Y"
+                                },
+                                {
+                                    "field": "Grupo",
+                                    "type": "nominal"
+                                },
+                                {
+                                    "field": "MediaDiaria",
+                                    "type": "quantitative",
+                                    "format": ".1f"
+                                }
+                            ]
                         }
                     },
-                    "tooltip": [
-                        {
-                            "field": "Hora",
-                            "type": "ordinal",
-                            "title": "Hora"
+                    {
+                        "data": {
+                            "values": medias.to_dict(
+                                orient="records"
+                            )
                         },
-                        {
-                            "field": "Grupo",
-                            "type": "nominal"
+                        "mark": {
+                            "type": "rule",
+                            "strokeWidth": 7
                         },
-                        {
-                            "field": "Alugueis",
-                            "type": "quantitative",
-                            "title": "Média",
-                            "format": ".1f"
+                        "encoding": {
+                            "x": {
+                                "field": "IC_Inferior",
+                                "type": "quantitative"
+                            },
+                            "x2": {
+                                "field": "IC_Superior"
+                            },
+                            "y": {
+                                "field": "Centro",
+                                "type": "quantitative"
+                            },
+                            "color": {
+                                **cores,
+                                "legend": None
+                            },
+                            "tooltip": [
+                                {
+                                    "field": "Grupo",
+                                    "type": "nominal"
+                                },
+                                {
+                                    "field": "IC_Inferior",
+                                    "title": "IC inferior",
+                                    "format": ".2f"
+                                },
+                                {
+                                    "field": "IC_Superior",
+                                    "title": "IC superior",
+                                    "format": ".2f"
+                                }
+                            ]
                         }
-                    ]
-                },
-                "height": 300
+                    },
+                    {
+                        "data": {
+                            "values": medias.to_dict(
+                                orient="records"
+                            )
+                        },
+                        "mark": {
+                            "type": "point",
+                            "shape": "diamond",
+                            "filled": True,
+                            "size": 280,
+                            "stroke": "white",
+                            "strokeWidth": 1.5
+                        },
+                        "encoding": {
+                            "x": {
+                                "field": "MediaDiaria",
+                                "type": "quantitative"
+                            },
+                            "y": {
+                                "field": "Centro",
+                                "type": "quantitative"
+                            },
+                            "color": {
+                                **cores,
+                                "legend": None
+                            },
+                            "tooltip": [
+                                {
+                                    "field": "Grupo",
+                                    "type": "nominal"
+                                },
+                                {
+                                    "field": "MediaDiaria",
+                                    "title": "Média do grupo",
+                                    "format": ".2f"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "height": 230
             },
             use_container_width=True
         )
 
         st.caption(
-            "As linhas mostram a média de aluguéis "
-            "em cada hora do dia para cada grupo."
+            "Pontos: médias dos dias. "
+            "Losangos: médias dos grupos. "
+            "Barras coloridas: IC de 95% de cada média."
         )
 
         c1, c2 = st.columns(2)
 
         with c1:
             st.metric(
-                f"Média diária: {nome_a}",
-                f"{grupo_a.mean():.1f}"
+                f"Média: {nome_a}",
+                f"{media_a:.1f}"
+            )
+
+            st.caption(
+                f"IC 95%: [{ic_a[0]:.1f}; {ic_a[1]:.1f}]"
             )
 
         with c2:
             st.metric(
-                f"Média diária: {nome_b}",
-                f"{grupo_b.mean():.1f}"
+                f"Média: {nome_b}",
+                f"{media_b:.1f}"
             )
 
-        c3, c4 = st.columns(2)
-
-        with c3:
-            st.metric(
-                "Diferença de médias",
-                f"{diferenca:.1f}"
+            st.caption(
+                f"IC 95%: [{ic_b[0]:.1f}; {ic_b[1]:.1f}]"
             )
 
-        with c4:
-            valor_p = (
-                "< 0,0001"
-                if teste.pvalue < 0.0001
-                else f"{teste.pvalue:.4f}".replace(".", ",")
-            )
+        st.divider()
 
-            st.metric("Valor-p", valor_p)
+        st.markdown(
+            "**Intervalo de confiança da diferença entre médias**"
+        )
 
-        st.caption(
-            f"Intervalo de confiança de 95%: "
-            f"[{ic.low:.2f}; {ic.high:.2f}]"
+        intervalo = pd.DataFrame({
+            "Inferior": [float(ic_diferenca.low)],
+            "Superior": [float(ic_diferenca.high)],
+            "Diferenca": [float(diferenca)],
+            "Linha": ["Diferença"]
+        })
+
+        st.vega_lite_chart(
+            intervalo,
+            {
+                "layer": [
+                    {
+                        "mark": {
+                            "type": "rule",
+                            "color": "#94A3B8",
+                            "strokeDash": [5, 5]
+                        },
+                        "encoding": {
+                            "x": {
+                                "datum": 0,
+                                "type": "quantitative"
+                            }
+                        }
+                    },
+                    {
+                        "mark": {
+                            "type": "rule",
+                            "color": "#0D9488",
+                            "strokeWidth": 7
+                        },
+                        "encoding": {
+                            "x": {
+                                "field": "Inferior",
+                                "type": "quantitative",
+                                "title": f"Diferença: {nome_a} − {nome_b}"
+                            },
+                            "x2": {
+                                "field": "Superior"
+                            },
+                            "y": {
+                                "field": "Linha",
+                                "type": "nominal",
+                                "axis": None
+                            }
+                        }
+                    },
+                    {
+                        "mark": {
+                            "type": "point",
+                            "shape": "diamond",
+                            "filled": True,
+                            "color": "#115E59",
+                            "size": 210
+                        },
+                        "encoding": {
+                            "x": {
+                                "field": "Diferenca",
+                                "type": "quantitative"
+                            },
+                            "y": {
+                                "field": "Linha",
+                                "type": "nominal",
+                                "axis": None
+                            },
+                            "tooltip": [
+                                {
+                                    "field": "Diferenca",
+                                    "title": "Diferença",
+                                    "format": ".2f"
+                                },
+                                {
+                                    "field": "Inferior",
+                                    "title": "IC inferior",
+                                    "format": ".2f"
+                                },
+                                {
+                                    "field": "Superior",
+                                    "title": "IC superior",
+                                    "format": ".2f"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "height": 70
+            },
+            use_container_width=True
         )
 
         st.caption(
-            f"Amostra: {len(grupo_a)} e {len(grupo_b)} dias."
+            "Linha pontilhada: diferença zero. "
+            "Segmento verde: IC de 95% da diferença."
+        )
+
+        c3, c4 = st.columns(2)
+
+        valor_p = (
+            "< 0,0001"
+            if teste.pvalue < 0.0001
+            else f"{teste.pvalue:.4f}".replace(".", ",")
+        )
+
+        with c3:
+            st.metric(
+                "Valor-p",
+                valor_p
+            )
+
+        with c4:
+            st.metric(
+                "Diferença estimada",
+                f"{diferenca:.1f}"
+            )
+
+        st.caption(
+            f"IC 95% da diferença: "
+            f"[{ic_diferenca.low:.2f}; {ic_diferenca.high:.2f}]"
+        )
+
+        st.caption(
+            f"Amostras: {len(grupo_a)} e {len(grupo_b)} dias."
         )
 
     return {
         "Teste": titulo,
         "Diferença de médias": round(diferenca, 2),
-        "Valor-p": round(teste.pvalue, 5),
-        "IC 95%": f"[{ic.low:.2f}; {ic.high:.2f}]"
+        "Valor-p": round(float(teste.pvalue), 5),
+        "IC 95%": (
+            f"[{ic_diferenca.low:.2f}; "
+            f"{ic_diferenca.high:.2f}]"
+        )
     }
 
 
-chuva_teste = diario.loc[diario["Choveu"], "Media"]
-sem_chuva_teste = diario.loc[~diario["Choveu"], "Media"]
+chuva = diario.loc[diario["Choveu"], "Media"]
+sem_chuva = diario.loc[~diario["Choveu"], "Media"]
 
-fins_teste = diario.loc[diario["FimSemana"], "Media"]
-uteis_teste = diario.loc[~diario["FimSemana"], "Media"]
-
-
-dados_chuva = df.copy()
-
-dados_chuva["Choveu"] = dados_chuva["Data"].map(
-    diario["Choveu"]
-)
-
-dados_chuva["Grupo"] = dados_chuva["Choveu"].map({
-    True: "Com chuva",
-    False: "Sem chuva"
-})
-
-comparacao_chuva = dados_chuva.groupby(
-    ["Hora", "Grupo"],
-    as_index=False
-)["Alugueis"].mean()
-
-
-dados_fim = df.copy()
-
-dados_fim["Grupo"] = dados_fim["FimSemana"].map({
-    True: "Fim de semana",
-    False: "Dias úteis"
-})
-
-comparacao_fim = dados_fim.groupby(
-    ["Hora", "Grupo"],
-    as_index=False
-)["Alugueis"].mean()
+fins = diario.loc[diario["FimSemana"], "Media"]
+uteis = diario.loc[~diario["FimSemana"], "Media"]
 
 
 h1, h2 = st.columns(2, gap="medium")
 
 with h1:
-    resultado1 = grafico_teste_linhas(
+    resultado1 = grafico_teste(
         "Chuva × Sem chuva",
-        comparacao_chuva,
+        chuva,
+        sem_chuva,
         "Com chuva",
         "Sem chuva",
         "#579BD3",
-        "#EFB742",
-        chuva_teste,
-        sem_chuva_teste
+        "#EFB742"
     )
 
 with h2:
-    resultado2 = grafico_teste_linhas(
+    resultado2 = grafico_teste(
         "Fim de semana × Dias úteis",
-        comparacao_fim,
+        fins,
+        uteis,
         "Fim de semana",
         "Dias úteis",
         "#D97B55",
-        "#40AA82",
-        fins_teste,
-        uteis_teste
+        "#40AA82"
     )
 
 
 with st.expander("Tabela dos resultados estatísticos"):
     resultados = pd.DataFrame([
-        resultado1,
-        resultado2
+        r for r in [resultado1, resultado2]
+        if r is not None
     ])
 
     st.dataframe(
@@ -547,12 +783,14 @@ with st.expander("Tabela dos resultados estatísticos"):
         hide_index=True
     )
 
+
 st.caption(
-    "Os testes utilizam todos os dias disponíveis, "
-    "sem aplicar os filtros superiores. "
-    "Os gráficos mostram a média horária de cada grupo, "
-    "enquanto os testes comparam as médias diárias. "
-    "Diferenças estatísticas não demonstram causalidade."
+    "Os testes usam todos os dias disponíveis, "
+    "sem os filtros superiores. "
+    "As observações são médias diárias; "
+    "os testes consideram variâncias diferentes. "
+    "A dependência entre dias pode afetar a inferência. "
+    "Associação não comprova causalidade."
 )
 
 
@@ -593,27 +831,28 @@ total = (
 
 r_quadrado = (
     1 - erro.pow(2).sum() / total
-    if total > 0 else float("nan")
+    if total > 0
+    else float("nan")
 )
 
 
-rcol1, rcol2, rcol3 = st.columns(3)
+r1, r2, r3 = st.columns(3)
 
-with rcol1:
+with r1:
     st.metric(
         "Erro médio (MAE)",
         f"{mae:.1f}",
         border=True
     )
 
-with rcol2:
+with r2:
     st.metric(
         "Erro quadrático (RMSE)",
         f"{rmse:.1f}",
         border=True
     )
 
-with rcol3:
+with r3:
     st.metric(
         "R² no teste",
         f"{r_quadrado:.3f}",
@@ -622,7 +861,9 @@ with rcol3:
 
 
 with st.container(border=True):
-    st.markdown("#### Temperatura × Demanda — Regressão linear")
+    st.markdown(
+        "#### Temperatura × Demanda — Regressão linear"
+    )
 
     grafico = teste[
         ["Temperatura", "Real", "Previsto"]
@@ -654,7 +895,6 @@ with st.container(border=True):
                             {
                                 "field": "Data",
                                 "type": "temporal",
-                                "title": "Data",
                                 "format": "%d/%m/%Y"
                             },
                             {
@@ -664,7 +904,6 @@ with st.container(border=True):
                             },
                             {
                                 "field": "Real",
-                                "type": "quantitative",
                                 "title": "Aluguéis observados",
                                 "format": ".1f"
                             }
@@ -694,7 +933,6 @@ with st.container(border=True):
                             },
                             {
                                 "field": "Previsto",
-                                "type": "quantitative",
                                 "title": "Aluguéis previstos",
                                 "format": ".1f"
                             }
@@ -708,31 +946,20 @@ with st.container(border=True):
     )
 
     st.caption(
-        "Azul: valores reais observados. "
-        "Verde: valores estimados pela regressão linear. "
-        "O gráfico utiliza os dados do conjunto de teste."
+        "Azul: médias diárias observadas. "
+        "Verde: estimativas da regressão. "
+        "Gráfico dos dias do conjunto de teste."
     )
 
 
 with st.expander("Detalhes do modelo"):
-    st.markdown("**Equação da regressão**")
-
     st.write(
-        f"Y = {modelo.intercept:.2f} "
+        f"Equação: Y = {modelo.intercept:.2f} "
         f"+ ({modelo.slope:.2f} × Temperatura)"
     )
 
-    st.markdown("**Divisão dos dados**")
-
-    st.write(
-        "Treinamento: primeiros 80% dos dias."
-    )
-
-    st.write(
-        "Teste: últimos 20% dos dias."
-    )
-
-    st.markdown("**Valores utilizados na avaliação**")
+    st.write("Treinamento: primeiros 80% dos dias.")
+    st.write("Teste: últimos 20% dos dias.")
 
     st.dataframe(
         teste[["Temperatura", "Real", "Previsto"]].round(2),
