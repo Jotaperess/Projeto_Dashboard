@@ -1,11 +1,4 @@
-# Projeto Dashboard — versão simplificada
-
-## O que mudou
-
-- Notebook reduzido a análises centrais: preparação, tabelas, três gráficos, dois testes t de Welch, intervalo de confiança, regressão linear simples e aplicação dos horários prioritários.
-- Dashboard em **uma página**, com visual claro (verde e branco), **dois filtros**, três gráficos principais, testes e previsão.
-- Apenas **quatro bibliotecas**: pandas, matplotlib, scipy e streamlit.
-- Sem comentários nas células Python do notebook; explicações ficam nas células Markdown.
+# Projeto Dashboard 
 
 ## Como usar
 
